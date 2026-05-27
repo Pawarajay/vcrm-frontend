@@ -1,31 +1,42 @@
+// "use client"
+
+// import { useAuth } from "@/contexts/auth-context"
+// import { LoginForm } from "@/components/auth/login-form"
+// import { Header } from "@/components/layout/header"
+// import { LeadsContent } from "@/components/leads/leads-content"
+
+// export default function LeadsPage() {
+//   const { user, isLoading } = useAuth()
+
+//   if (isLoading) {
+//     return (
+//       <div className="min-h-screen flex items-center justify-center">
+//         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+//       </div>
+//     )
+//   }
+
+//   if (!user) {
+//     return <LoginForm />
+//   }
+
+//   return (
+//     <div className="flex flex-col h-full">
+//       <Header />
+//       <main className="flex-1 overflow-auto">
+//         <LeadsContent />
+//       </main>
+//     </div>
+//   )
+// }
+
+
+//testing (27-05-2026)
+// app/leads/page.tsx
 "use client"
 
-import { useAuth } from "@/contexts/auth-context"
-import { LoginForm } from "@/components/auth/login-form"
-import { Header } from "@/components/layout/header"
 import { LeadsContent } from "@/components/leads/leads-content"
 
 export default function LeadsPage() {
-  const { user, isLoading } = useAuth()
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return <LoginForm />
-  }
-
-  return (
-    <div className="flex flex-col h-full">
-      <Header />
-      <main className="flex-1 overflow-auto">
-        <LeadsContent />
-      </main>
-    </div>
-  )
+  return <LeadsContent />
 }
