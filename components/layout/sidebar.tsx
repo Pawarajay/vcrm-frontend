@@ -263,9 +263,9 @@ const MAIN_NAV = [
   { name: "Leads",     href: "/leads",      icon: UserPlus           },
   { name: "Clients",   href: "/customers",  icon: Users              },
   { name: "Retainers", href: "/retainers",  icon: RefreshCw          },
-  { name: "Invoices",  href: "/invoices",   icon: ReceiptIndianRupee },
+  // { name: "Invoices",  href: "/invoices",   icon: ReceiptIndianRupee },
   { name: "Reports",   href: "/reports",    icon: BarChart3          },
-  { name: "Projects",  href: "/projects",   icon: FolderKanban       },
+  // { name: "Projects",  href: "/projects",   icon: FolderKanban       },
 ]
 
 const ADMIN_NAV = [
