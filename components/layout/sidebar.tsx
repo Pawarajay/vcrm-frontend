@@ -262,15 +262,15 @@ const MAIN_NAV = [
   { name: "Dashboard", href: "/",           icon: LayoutDashboard    },
   { name: "Leads",     href: "/leads",      icon: UserPlus           },
   { name: "Clients",   href: "/customers",  icon: Users              },
-  { name: "Projects",  href: "/projects",   icon: FolderKanban       },
   { name: "Retainers", href: "/retainers",  icon: RefreshCw          },
   { name: "Invoices",  href: "/invoices",   icon: ReceiptIndianRupee },
   { name: "Reports",   href: "/reports",    icon: BarChart3          },
+  { name: "Projects",  href: "/projects",   icon: FolderKanban       },
 ]
 
 const ADMIN_NAV = [
   { name: "Users",    href: "/admin/users"    },
-  { name: "Settings", href: "/admin/settings" },
+  // { name: "Settings", href: "/admin/settings" },
 ]
 
 export function Sidebar() {

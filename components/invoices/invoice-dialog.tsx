@@ -1,354 +1,321 @@
 
 "use client"
 
-import type React from "react"
 import { useState, useEffect, useCallback } from "react"
+import { X, Plus, Trash2, Search, ChevronDown } from "lucide-react"
 import { useCRM } from "@/contexts/crm-context"
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Badge } from "@/components/ui/badge"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Switch } from "@/components/ui/switch"
-import { Separator } from "@/components/ui/separator"
-import {
-  Plus,
-  Trash2,
-  AlertCircle,
-  RefreshCw,
-  Stethoscope,
-  IndianRupee,
-} from "lucide-react"
 import type { Invoice } from "@/types/crm"
 
-// ─── TYPES ────────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
-type BreakdownItem = { label: string; amount: number }
+const STATUS_OPTIONS = ["draft", "sent", "pending", "paid", "overdue", "cancelled"]
 
-type LineItemForm = {
+const EMPTY_ITEM = () => ({ id: crypto.randomUUID(), description: "", quantity: 1, rate: 0, amount: 0, hsn: "998313" })
+
+const EMPTY_FORM = {
+  customerId:         "",
+  status:             "draft" as string,
+  issueDate:          new Date().toISOString().slice(0, 10),
+  dueDate:            "",
+  tax:                18,
+  discount:           0,
+  notes:              "",
+  isRecurring:        false,
+  recurringFrequency: "monthly",
+  recurringCycles:    "",
+  recurringStartDate: "",
+  recurringEndDate:   "",
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface LineItem {
+  id:          string
   description: string
-  quantity: number
-  rate: number
-  amount: number
-  breakdown?: BreakdownItem[]
+  quantity:    number
+  rate:        number
+  amount:      number
+  hsn:         string
 }
 
-type InvoiceFormState = {
-  customerId: string
-  customerName: string
-  invoiceNumber: string
-  issueDate: string
-  dueDate: string
-  status: Invoice["status"]
-  subtotal: number
-  gstRate: number
-  notes: string
-  service: string
-  amount: string
-  items: LineItemForm[]
-  // Recurring fields
-  isRecurring: boolean
-  recurringFrequency: "weekly" | "monthly" | "quarterly" | "yearly"
-  recurringStartDate: string
-  recurringEndDate: string
-  recurringCycles: string
+interface Props {
+  invoice:        Invoice | null        // null = create mode
+  open:           boolean
+  onOpenChange:   (open: boolean) => void
 }
 
-// ─── MEDICAL SERVICES ─────────────────────────────────────────────────────────
+// ─── Customer Picker ──────────────────────────────────────────────────────────
 
-const MEDICAL_SERVICES = [
-  { value: "haemodialysis", label: "Home Haemodialysis" },
-  { value: "hdf",           label: "HDF At-home" },
-  { value: "peritoneal",    label: "Peritoneal Dialysis" },
-  { value: "nursing",       label: "ANM/GNM Nurse" },
-  { value: "lab-tests",             label: "Lab Tests & Diagnostics" },
-  { value: "medications",           label: "Medications" },
-  { value: "other",                 label: "Other Medical Service" },
-]
+function CustomerPicker({
+  customers,
+  value,
+  onChange,
+  disabled,
+}: {
+  customers: any[]
+  value:     string
+  onChange:  (id: string, customer: any) => void
+  disabled?: boolean
+}) {
+  const [search, setSearch]   = useState("")
+  const [open,   setOpen]     = useState(false)
 
-const GST_RATES = [0, 5, 12, 18, 28]
-
-// ─── HELPERS ─────────────────────────────────────────────────────────────────
-
-const toDateString = (d: Date) => d.toISOString().split("T")[0]
-
-const addMonths = (date: Date, months: number) => {
-  const d = new Date(date)
-  const day = d.getDate()
-  d.setMonth(d.getMonth() + months)
-  if (d.getDate() < day) d.setDate(0)
-  return d
-}
-
-const formatCurrency = (value: number) =>
-  `₹${value.toLocaleString("en-IN", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`
-
-const generateRNLNumber = () => {
-  const seq = String(Date.now()).slice(-4).padStart(4, "0")
-  return `RNL-${seq}`
-}
-
-// ─── COMPONENT ────────────────────────────────────────────────────────────────
-
-interface InvoiceDialogProps {
-  invoice: Invoice | null
-  open: boolean
-  onOpenChange: (open: boolean) => void
-}
-
-export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProps) {
-  const { customers, addInvoice, updateInvoice } = useCRM()
-
-  const [formData, setFormData] = useState<InvoiceFormState>({
-    customerId: "",
-    customerName: "",
-    invoiceNumber: "",
-    issueDate: "",
-    dueDate: "",
-    status: "draft",
-    subtotal: 0,
-    gstRate: 18,
-    notes: "",
-    service: "",
-    amount: "",
-    items: [],
-    isRecurring: false,
-    recurringFrequency: "monthly",
-    recurringStartDate: "",
-    recurringEndDate: "",
-    recurringCycles: "12",
+  const selected  = customers.find((c) => c.id === value)
+  const filtered  = customers.filter((c) => {
+    const q = search.toLowerCase()
+    return (
+      c.name?.toLowerCase().includes(q) ||
+      c.company?.toLowerCase().includes(q) ||
+      c.phone?.includes(q) ||
+      c.email?.toLowerCase().includes(q)
+    )
   })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
-  // ── Recalc helpers ────────────────────────────────────────────────────────
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((o) => !o)}
+        className={`w-full flex items-center justify-between rounded-xl border px-3 py-2 text-sm text-left transition-colors
+          ${value
+            ? "border-[#3A7AFE] bg-blue-50 text-gray-900"
+            : "border-gray-200 bg-white text-gray-400"}
+          ${disabled ? "opacity-50 cursor-not-allowed" : "hover:border-[#3A7AFE] cursor-pointer"}`}
+      >
+        <span className={value ? "text-gray-900 font-medium" : "text-gray-400"}>
+          {selected
+            ? `${selected.name}${selected.company ? ` — ${selected.company}` : ""}`
+            : "Select customer..."}
+        </span>
+        <ChevronDown size={14} className={`text-gray-400 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
 
-  const recalcSubtotalFromItems = useCallback((items: LineItemForm[]) => {
-    const subtotal = items.reduce((sum, it) => sum + (it.amount || 0), 0)
-    setFormData((prev) => ({
-      ...prev,
-      items,
-      subtotal,
-      amount: subtotal ? String(subtotal) : prev.amount,
-    }))
-  }, [])
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute left-0 top-11 z-20 w-full bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden">
+            <div className="p-2 border-b border-gray-100">
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  autoFocus
+                  type="text"
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search by name, company, phone..."
+                  className="w-full pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg focus:border-[#3A7AFE] focus:outline-none"
+                />
+              </div>
+            </div>
+            <div className="max-h-52 overflow-y-auto">
+              {filtered.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6">No customers found</p>
+              ) : (
+                filtered.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    onClick={() => { onChange(c.id, c); setOpen(false); setSearch("") }}
+                    className={`w-full text-left px-3 py-2.5 hover:bg-blue-50 transition-colors border-b border-gray-50 last:border-0
+                      ${c.id === value ? "bg-blue-50" : ""}`}
+                  >
+                    <p className="text-sm font-semibold text-gray-900">{c.name}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {[c.company, c.phone, c.email].filter(Boolean).join(" · ")}
+                    </p>
+                  </button>
+                ))
+              )}
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
-  const handleAddItem = () => {
-    recalcSubtotalFromItems([
-      ...formData.items,
-      {
-        description: "",
-        quantity: 1,
-        rate: 0,
-        amount: 0,
-        breakdown: [],
-      },
-    ])
+// ─── Line Item Row ────────────────────────────────────────────────────────────
+
+function ItemRow({
+  item,
+  index,
+  onChange,
+  onRemove,
+  canRemove,
+}: {
+  item:     LineItem
+  index:    number
+  onChange: (id: string, field: keyof LineItem, value: any) => void
+  onRemove: (id: string) => void
+  canRemove: boolean
+}) {
+  const inputCls = "rounded-lg border border-gray-200 focus:border-[#3A7AFE] focus:outline-none text-sm px-2 py-1.5 w-full bg-white"
+
+  const handleQtyRate = (field: "quantity" | "rate", val: string) => {
+    const n = parseFloat(val) || 0
+    const qty  = field === "quantity" ? n  : item.quantity
+    const rate = field === "rate"     ? n  : item.rate
+    onChange(item.id, field,    n)
+    onChange(item.id, "amount", parseFloat((qty * rate).toFixed(2)))
   }
 
-  const handleRemoveItem = (index: number) => {
-    recalcSubtotalFromItems(formData.items.filter((_, i) => i !== index))
-  }
+  return (
+    <tr className="border-b border-gray-100 last:border-0">
+      <td className="py-2 pr-2 text-center text-xs text-gray-400 w-8">{index + 1}</td>
+      <td className="py-2 pr-2">
+        <input
+          type="text"
+          value={item.description}
+          onChange={(e) => onChange(item.id, "description", e.target.value)}
+          placeholder="Service / item description"
+          className={inputCls}
+        />
+      </td>
+      <td className="py-2 pr-2 w-20">
+        <input
+          type="text"
+          value={item.hsn}
+          onChange={(e) => onChange(item.id, "hsn", e.target.value)}
+          placeholder="HSN"
+          className={inputCls}
+        />
+      </td>
+      <td className="py-2 pr-2 w-16">
+        <input
+          type="number"
+          min="1"
+          value={item.quantity}
+          onChange={(e) => handleQtyRate("quantity", e.target.value)}
+          className={inputCls}
+        />
+      </td>
+      <td className="py-2 pr-2 w-24">
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={item.rate}
+          onChange={(e) => handleQtyRate("rate", e.target.value)}
+          className={inputCls}
+        />
+      </td>
+      <td className="py-2 pr-2 w-24">
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={item.amount}
+          onChange={(e) => onChange(item.id, "amount", parseFloat(e.target.value) || 0)}
+          className={inputCls}
+        />
+      </td>
+      <td className="py-2 w-8 text-center">
+        {canRemove && (
+          <button
+            type="button"
+            onClick={() => onRemove(item.id)}
+            className="text-gray-300 hover:text-red-500 transition-colors"
+          >
+            <Trash2 size={14} />
+          </button>
+        )}
+      </td>
+    </tr>
+  )
+}
 
-  const handleItemChange = (
-    index: number,
-    field: keyof LineItemForm,
-    value: string
-  ) => {
-    const nextItems = formData.items.map((item, i) => {
-      if (i !== index) return item
-      const updated: LineItemForm = { ...item }
-      if (field === "description") {
-        updated.description = value
-      } else if (field === "quantity") {
-        updated.quantity = Number(value || 0)
-        updated.amount = updated.quantity * updated.rate
-      } else if (field === "rate") {
-        updated.rate = Number(value || 0)
-        updated.amount = updated.quantity * updated.rate
-      } else if (field === "amount") {
-        updated.amount = Number(value || 0)
-        updated.rate = updated.quantity > 0 ? updated.amount / updated.quantity : updated.amount
-      }
-      return updated
-    })
-    recalcSubtotalFromItems(nextItems)
-  }
+// ─── Main Dialog ──────────────────────────────────────────────────────────────
 
-  // ── Init form ─────────────────────────────────────────────────────────────
+export function InvoiceDialog({ invoice, open, onOpenChange }: Props) {
+  const { customers, addInvoice, updateInvoice } = useCRM()
+  const isEdit = !!invoice
+
+  const [form,    setForm]    = useState(EMPTY_FORM)
+  const [items,   setItems]   = useState<LineItem[]>([EMPTY_ITEM()])
+  const [saving,  setSaving]  = useState(false)
+  const [error,   setError]   = useState<string | null>(null)
+  const [tab,     setTab]     = useState<"details" | "items" | "settings">("details")
+
+  // ── Populate form when editing ────────────────────────────────────────────
 
   useEffect(() => {
     if (!open) return
-    const today = new Date()
-    const defaultDue = addMonths(today, 1)
 
     if (invoice) {
-      const issue = invoice.issueDate ? new Date(invoice.issueDate) : today
-      const due   = invoice.dueDate   ? new Date(invoice.dueDate)   : defaultDue
-
-      const subtotal =
-        typeof invoice.amount === "number"
-          ? invoice.amount
-          : Number(invoice.amount ?? 0) || 0
-
-      const firstItem = invoice.items?.[0]
-      const service   = firstItem?.description ?? (invoice as any).service ?? ""
-      const amount    = firstItem?.amount ?? subtotal
-
-      const items: LineItemForm[] =
-        invoice.items?.length
-          ? invoice.items.map((it: any) => {
-              let parsedBreakdown: BreakdownItem[] | undefined
-              try {
-                parsedBreakdown =
-                  typeof it.breakdown === "string"
-                    ? JSON.parse(it.breakdown)
-                    : it.breakdown
-              } catch { parsedBreakdown = undefined }
-              return {
-                description: it.description,
-                quantity:    it.quantity ?? 1,
-                rate:        Number(it.rate   ?? 0) || 0,
-                amount:      Number(it.amount ?? 0) || 0,
-                breakdown:   parsedBreakdown,
-              }
-            })
-          : service || amount
-          ? [{ description: service || "Medical Service", quantity: 1, rate: Number(amount) || 0, amount: Number(amount) || 0, breakdown: [] }]
-          : []
-
-      const subtotalFromItems = items.reduce((s, it) => s + it.amount, 0) || subtotal
-      const recInv = invoice as any
-
-      setFormData({
-        customerId:       invoice.customerId,
-        customerName:     invoice.customerName,
-        invoiceNumber:    invoice.invoiceNumber,
-        issueDate:        toDateString(issue),
-        dueDate:          toDateString(due),
-        status:           invoice.status,
-        subtotal:         subtotalFromItems,
-        gstRate:          invoice.tax ?? 18,
-        notes:            invoice.notes || "",
-        service,
-        amount:           amount ? String(amount) : "",
-        items,
-        isRecurring:      recInv.isRecurring ?? false,
-        recurringFrequency: recInv.recurringFrequency ?? "monthly",
-        recurringStartDate: recInv.recurringStartDate ? toDateString(new Date(recInv.recurringStartDate)) : toDateString(today),
-        recurringEndDate:   recInv.recurringEndDate ? toDateString(new Date(recInv.recurringEndDate)) : "",
-        recurringCycles:    String(recInv.recurringCycles ?? 12),
+      setForm({
+        customerId:         (invoice as any).customerId   || (invoice as any).customer_id || "",
+        status:             invoice.status                || "draft",
+        issueDate:          invoice.issueDate
+                              ? new Date(invoice.issueDate).toISOString().slice(0, 10)
+                              : new Date().toISOString().slice(0, 10),
+        dueDate:            invoice.dueDate
+                              ? new Date(invoice.dueDate).toISOString().slice(0, 10)
+                              : "",
+        tax:                typeof invoice.tax === "number" ? invoice.tax : 18,
+        discount:           typeof invoice.discount === "number" ? invoice.discount : 0,
+        notes:              invoice.notes || "",
+        isRecurring:        !!(invoice as any).isRecurring,
+        recurringFrequency: (invoice as any).recurringFrequency || "monthly",
+        recurringCycles:    String((invoice as any).recurringCycles || ""),
+        recurringStartDate: (invoice as any).recurringStartDate
+                              ? new Date((invoice as any).recurringStartDate).toISOString().slice(0, 10)
+                              : "",
+        recurringEndDate:   (invoice as any).recurringEndDate
+                              ? new Date((invoice as any).recurringEndDate).toISOString().slice(0, 10)
+                              : "",
       })
+      const existingItems: LineItem[] = Array.isArray((invoice as any).items) && (invoice as any).items.length > 0
+        ? (invoice as any).items.map((it: any) => ({
+            id:          it.id || crypto.randomUUID(),
+            description: it.description || "",
+            quantity:    Number(it.quantity) || 1,
+            rate:        Number(it.rate)     || 0,
+            amount:      Number(it.amount)   || 0,
+            hsn:         it.hsn || "998313",
+          }))
+        : [EMPTY_ITEM()]
+      setItems(existingItems)
     } else {
-      setFormData({
-        customerId: "",
-        customerName: "",
-        invoiceNumber: generateRNLNumber(),
-        issueDate:    toDateString(today),
-        dueDate:      toDateString(defaultDue),
-        status:       "draft",
-        subtotal:     0,
-        gstRate:      18,
-        notes:        "",
-        service:      "",
-        amount:       "",
-        items:        [],
-        isRecurring:  false,
-        recurringFrequency: "monthly",
-        recurringStartDate: toDateString(today),
-        recurringEndDate:   "",
-        recurringCycles:    "12",
-      })
+      setForm(EMPTY_FORM)
+      setItems([EMPTY_ITEM()])
     }
+    setTab("details")
     setError(null)
-  }, [invoice, open])
+  }, [open, invoice])
 
-  // ── Customer auto-fill ────────────────────────────────────────────────────
+  // ── Customer pre-fill ─────────────────────────────────────────────────────
 
-  const handleCustomerChange = (customerId: string) => {
-    const customer = customers.find((c) => c.id === customerId)
-    if (!customer) return
+  const handleCustomerChange = useCallback((id: string, customer: any) => {
+    setForm((prev) => ({
+      ...prev,
+      customerId: id,
+      tax:        typeof customer.defaultTaxRate === "number"
+                    ? customer.defaultTaxRate
+                    : Number(customer.default_tax_rate || prev.tax),
+      notes:      customer.defaultInvoiceNotes || customer.default_invoice_notes || prev.notes,
+      dueDate:    (() => {
+        const days = Number(customer.defaultDueDays ?? customer.default_due_days ?? 5)
+        const d    = new Date()
+        d.setDate(d.getDate() + days)
+        return d.toISOString().slice(0, 10)
+      })(),
+    }))
+  }, [])
 
-    setFormData((prev) => {
-      const issue = prev.issueDate ? new Date(prev.issueDate) : new Date()
+  // ── Line items helpers ────────────────────────────────────────────────────
 
-      let nextDueDate = prev.dueDate
-      if ((customer as any).defaultDueDays > 0) {
-        const due = new Date(issue)
-        due.setDate(due.getDate() + Number((customer as any).defaultDueDays))
-        nextDueDate = toDateString(due)
-      }
-
-      // Detect medical service
-      const svcType = (customer as any).serviceType || (customer as any).service || ""
-      const svcLabel = MEDICAL_SERVICES.find(s => s.value === svcType)?.label
-        || (svcType === "haemodialysis" ? "Home Haemodialysis"
-           : svcType === "hdf"          ? "HDF At-home"
-           : svcType === "peritoneal"   ? "Peritoneal Dialysis"
-           : svcType === "nursing"      ? "ANM/GNM Nurse"
-           : (customer as any).service         ? String((customer as any).service)
-           : "Medical Service")
-
-      const oneTime = Number((customer as any).oneTimePrice  || 0)
-      const monthly = Number((customer as any).monthlyPrice  || 0)
-      const manual  = Number((customer as any).manualPrice   || 0)
-      let serviceAmount = oneTime + monthly + manual
-
-      if (!serviceAmount) {
-        serviceAmount = Number((customer as any).totalValue || 0)
-          || Number((customer as any).recurringAmount || 0)
-      }
-
-      const breakdown: BreakdownItem[] = []
-      if (oneTime > 0) breakdown.push({ label: "One-time / Procedure", amount: oneTime })
-      if (monthly > 0) breakdown.push({ label: "Monthly / Recurring",   amount: monthly })
-      if (manual  > 0) breakdown.push({ label: "Additional Charges",    amount: manual  })
-
-      let descriptionFull = svcLabel
-      if (breakdown.length > 0) {
-        const readable = breakdown.map(b => `${b.label}: ₹${b.amount}`).join(", ")
-        descriptionFull = `${svcLabel} (${readable})`
-      }
-
-      const updatedItems: LineItemForm[] =
-        serviceAmount > 0 || descriptionFull
-          ? [{ description: descriptionFull, quantity: 1, rate: serviceAmount, amount: serviceAmount, breakdown: breakdown.length ? breakdown : undefined }]
-          : prev.items || []
-
-      const subtotalFromItems = updatedItems.reduce((s, it) => s + it.amount, 0)
-
-      return {
-        ...prev,
-        customerId,
-        customerName:  customer.name || "",
-        dueDate:       nextDueDate,
-        notes:         (customer as any).defaultInvoiceNotes || prev.notes,
-        service:       descriptionFull || prev.service,
-        amount:        subtotalFromItems ? String(subtotalFromItems) : prev.amount,
-        subtotal:      subtotalFromItems || prev.subtotal,
-        items:         updatedItems,
-        // Auto-enable recurring for dialysis patients
-        isRecurring:   ["haemodialysis","hdf","peritoneal"].includes(svcType) ? true : prev.isRecurring,
-      }
-    })
+  const updateItem = (id: string, field: keyof LineItem, value: any) => {
+    setItems((prev) => prev.map((it) => it.id === id ? { ...it, [field]: value } : it))
   }
+  const addItem    = () => setItems((prev) => [...prev, EMPTY_ITEM()])
+  const removeItem = (id: string) => setItems((prev) => prev.filter((it) => it.id !== id))
+
+  // ── Totals ────────────────────────────────────────────────────────────────
+
+  const subtotal = items.reduce((s, it) => s + (Number(it.amount) || 0), 0)
+  const taxAmt   = (subtotal * (Number(form.tax) || 0)) / 100
+  const total    = subtotal + taxAmt - (Number(form.discount) || 0)
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
@@ -356,486 +323,429 @@ export function InvoiceDialog({ invoice, open, onOpenChange }: InvoiceDialogProp
     e.preventDefault()
     setError(null)
 
-    if (!formData.customerId)              { setError("Patient / Customer is required.");            return }
-    if (!formData.invoiceNumber.trim())    { setError("Invoice number is required.");                return }
-    if (!formData.issueDate || !formData.dueDate) { setError("Issue date and due date are required."); return }
-    if (!formData.items.length && !formData.service.trim()) { setError("At least one service is required."); return }
+    if (!form.customerId) { setError("Please select a customer."); setTab("details"); return }
+    if (items.some((it) => !it.description.trim())) { setError("All items need a description."); setTab("items"); return }
 
-    const subtotal = formData.subtotal || Number(formData.amount) || 0
-    if (isNaN(subtotal) || subtotal <= 0) { setError("Amount must be a positive number."); return }
-
-    if (formData.isRecurring) {
-      if (!formData.recurringStartDate) { setError("Recurring start date is required."); return }
-      const cycles = Number(formData.recurringCycles)
-      if (isNaN(cycles) || cycles < 1)  { setError("Recurring cycles must be at least 1."); return }
-    }
-
-    const gstRate   = formData.gstRate ?? 18
-    const gstAmount = (subtotal * gstRate) / 100
-    const total     = subtotal + gstAmount
-
-    const itemsPayload = formData.items.length
-      ? formData.items.map(it => ({
-          description: it.description.trim() || formData.service.trim() || "Medical Service",
-          quantity:    it.quantity || 1,
-          rate:        it.rate,
-          amount:      it.amount,
-          breakdown:   it.breakdown?.length ? it.breakdown : undefined,
-        }))
-      : [{ description: formData.service.trim() || "Medical Service", quantity: 1, rate: subtotal, amount: subtotal, breakdown: undefined }]
-
-    const apiPayload: any = {
-      customerId: formData.customerId,
-      amount:     subtotal,
-      tax:        gstRate,
-      total,
-      status:     formData.status,
-      issueDate:  formData.issueDate,
-      dueDate:    formData.dueDate,
-      items:      itemsPayload,
-      notes:      formData.notes.trim(),
-      gstAmount,
-      isRecurring: formData.isRecurring,
-    }
-
-    if (formData.isRecurring) {
-      apiPayload.recurringFrequency  = formData.recurringFrequency
-      apiPayload.recurringStartDate  = formData.recurringStartDate
-      apiPayload.recurringEndDate    = formData.recurringEndDate || null
-      apiPayload.recurringCycles     = Number(formData.recurringCycles)
-    }
-
-    const invoiceData: Omit<Invoice, "id"> = {
-      customerId:    formData.customerId,
-      customerName:  formData.customerName,
-      invoiceNumber: formData.invoiceNumber.trim(),
-      issueDate:     formData.issueDate,
-      dueDate:       formData.dueDate,
-      status:        formData.status,
-      amount:        subtotal,
-      tax:           gstRate,
-      discount:      0,
-      notes:         formData.notes.trim(),
-      items:         itemsPayload as any,
-    }
-
-    setIsSubmitting(true)
+    setSaving(true)
     try {
-      if (invoice) {
-        await updateInvoice(invoice.id, invoiceData as any, apiPayload)
-      } else {
-        await addInvoice(invoiceData as any, apiPayload)
+      const payload = {
+        customerId:         form.customerId,
+        status:             form.status,
+        issueDate:          form.issueDate,
+        dueDate:            form.dueDate || null,
+        amount:             subtotal,
+        tax:                Number(form.tax),
+        discount:           Number(form.discount),
+        total,
+        notes:              form.notes || null,
+        isRecurring:        form.isRecurring,
+        recurringFrequency: form.isRecurring ? form.recurringFrequency : null,
+        recurringCycles:    form.isRecurring && form.recurringCycles ? Number(form.recurringCycles) : null,
+        recurringStartDate: form.isRecurring ? form.recurringStartDate || null : null,
+        recurringEndDate:   form.isRecurring ? form.recurringEndDate   || null : null,
+        items: items.map(({ description, quantity, rate, amount, hsn }) => ({
+          description, quantity, rate, amount, hsn,
+        })),
       }
-      onOpenChange(false)
+
+      let ok: boolean
+      if (isEdit) {
+        ok = await updateInvoice(invoice!.id, {} as any, payload)
+      } else {
+        ok = await addInvoice({} as any, payload)
+      }
+
+      if (ok) {
+        onOpenChange(false)
+      } else {
+        setError("Failed to save invoice. Please try again.")
+      }
     } catch (err: any) {
-      setError(err?.message || "Failed to save invoice. Please try again.")
+      setError(err?.message || "An unexpected error occurred.")
     } finally {
-      setIsSubmitting(false)
+      setSaving(false)
     }
   }
 
-  // ── Computed ──────────────────────────────────────────────────────────────
-  const gstAmount   = (formData.subtotal * (formData.gstRate ?? 18)) / 100
-  const totalWithGst = formData.subtotal + gstAmount
+  // ── Input class ───────────────────────────────────────────────────────────
 
-  const selectedCustomer = customers.find((c) => c.id === formData.customerId) ?? null
+  const inputCls = "rounded-xl border border-gray-200 focus:border-[#3A7AFE] focus:outline-none text-sm px-3 py-2 w-full bg-white h-9"
+  const selectCls = "rounded-xl border border-gray-200 focus:border-[#3A7AFE] focus:outline-none text-sm px-3 py-2 w-full bg-white h-9 text-gray-900"
+
+  if (!open) return null
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[92vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2 text-xl">
-            <Stethoscope className="h-5 w-5 text-primary" />
-            {invoice ? "Edit Invoice" : "Create New Invoice"}
-          </DialogTitle>
-        </DialogHeader>
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[94vh] flex flex-col">
 
-        <form onSubmit={handleSubmit} className="space-y-6 pt-2">
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+          <div>
+            <h2 className="text-lg font-bold text-gray-900">
+              {isEdit ? "Edit Invoice" : "New Invoice"}
+            </h2>
+            <p className="text-xs text-gray-400 mt-0.5">
+              {isEdit
+                ? `Editing ${(invoice as any).invoiceNumber || "invoice"}`
+                : "Create a new invoice linked to a customer"}
+            </p>
+          </div>
+          <button
+            onClick={() => onOpenChange(false)}
+            className="p-2 hover:bg-gray-100 rounded-xl transition-colors text-gray-500"
+          >
+            <X size={18} />
+          </button>
+        </div>
 
-          {/* ── Basic Info ──────────────────────────────────────────────── */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Tabs */}
+        <div className="px-6 flex gap-0 border-b border-gray-100 shrink-0">
+          {(["details", "items", "settings"] as const).map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => setTab(t)}
+              className={`px-4 py-3 text-sm font-medium border-b-2 capitalize transition-colors ${
+                tab === t
+                  ? "border-[#3A7AFE] text-[#3A7AFE]"
+                  : "border-transparent text-gray-500 hover:text-gray-700"
+              }`}
+            >
+              {t === "details" ? "Customer & Details"
+               : t === "items" ? `Line Items (${items.length})`
+               : "Settings"}
+            </button>
+          ))}
+        </div>
 
-            {/* Patient / Customer */}
-            <div className="space-y-2">
-              <Label htmlFor="customer">Patient / Customer <span className="text-red-500">*</span></Label>
-              <Select value={formData.customerId} onValueChange={handleCustomerChange}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select patient / customer" />
-                </SelectTrigger>
-                <SelectContent>
-                  {customers.map((c) => (
-                    <SelectItem key={c.id} value={c.id}>
-                      {c.name}{c.company ? ` — ${c.company}` : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+        {/* Body */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-hidden">
+          <div className="flex-1 overflow-y-auto px-6 py-5">
 
-            {/* Invoice Number */}
-            <div className="space-y-2">
-              <Label htmlFor="invoiceNumber">Invoice Number <span className="text-red-500">*</span></Label>
-              <div className="flex gap-2">
-                <Input
-                  id="invoiceNumber"
-                  value={formData.invoiceNumber}
-                  onChange={(e) => setFormData((p) => ({ ...p, invoiceNumber: e.target.value }))}
-                  placeholder="RNL-0001"
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  onClick={() => setFormData((p) => ({ ...p, invoiceNumber: generateRNLNumber() }))}
-                  title="Generate new number"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                </Button>
+            {/* Error */}
+            {error && (
+              <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
+                {error}
               </div>
-            </div>
+            )}
 
-            {/* Issue Date */}
-            <div className="space-y-2">
-              <Label htmlFor="issueDate">Issue Date <span className="text-red-500">*</span></Label>
-              <Input
-                id="issueDate"
-                type="date"
-                value={formData.issueDate}
-                onChange={(e) => setFormData((p) => ({ ...p, issueDate: e.target.value }))}
-                required
-              />
-            </div>
+            {/* ── Tab: Customer & Details ── */}
+            {tab === "details" && (
+              <div className="space-y-5">
 
-            {/* Due Date */}
-            <div className="space-y-2">
-              <Label htmlFor="dueDate">Due Date <span className="text-red-500">*</span></Label>
-              <Input
-                id="dueDate"
-                type="date"
-                value={formData.dueDate}
-                onChange={(e) => setFormData((p) => ({ ...p, dueDate: e.target.value }))}
-                required
-              />
-            </div>
-
-            {/* Status */}
-            <div className="space-y-2">
-              <Label>Status</Label>
-              <Select
-                value={formData.status}
-                onValueChange={(v: Invoice["status"]) => setFormData((p) => ({ ...p, status: v }))}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="draft">Draft</SelectItem>
-                  <SelectItem value="sent">Sent</SelectItem>
-                  <SelectItem value="paid">Paid</SelectItem>
-                  <SelectItem value="overdue">Overdue</SelectItem>
-                  <SelectItem value="cancelled">Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* GST Rate */}
-            <div className="space-y-2">
-              <Label>GST Rate (%)</Label>
-              <Select
-                value={String(formData.gstRate)}
-                onValueChange={(v) => setFormData((p) => ({ ...p, gstRate: Number(v) }))}
-              >
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {GST_RATES.map((r) => (
-                    <SelectItem key={r} value={String(r)}>
-                      {r}% {r === 0 ? "(Exempt)" : r === 5 ? "(Healthcare)" : r === 18 ? "(Standard)" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/* Customer details card */}
-            {selectedCustomer && (
-              <div className="md:col-span-2 text-sm border rounded-lg p-4 bg-gradient-to-br from-blue-50 to-indigo-50">
-                <h4 className="font-semibold mb-3 text-indigo-900 flex items-center gap-2">
-                  <Stethoscope className="h-4 w-4" />
-                  Patient Details
-                </h4>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2 text-xs">
-                  {[
-                    { label: "Name",    value: selectedCustomer.name },
-                    { label: "Email",   value: selectedCustomer.email },
-                    { label: "Phone",   value: selectedCustomer.phone },
-                    { label: "Company", value: selectedCustomer.company || "—" },
-                    { label: "Total Value", value: `₹${Number(selectedCustomer.totalValue || 0).toLocaleString("en-IN")}` },
-                  ].map(({ label, value }) => (
-                    <div key={label}>
-                      <span className="font-medium text-gray-500">{label}: </span>
-                      <span className="text-gray-900">{value}</span>
-                    </div>
-                  ))}
+                {/* Customer picker */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Customer <span className="text-red-500">*</span>
+                  </label>
+                  <CustomerPicker
+                    customers={customers}
+                    value={form.customerId}
+                    onChange={handleCustomerChange}
+                    disabled={isEdit}   // can't re-assign customer on edit
+                  />
+                  {isEdit && (
+                    <p className="text-xs text-gray-400 mt-1">Customer cannot be changed after invoice is created.</p>
+                  )}
                 </div>
+
+                {/* Customer preview card */}
+                {form.customerId && (() => {
+                  const c = customers.find((x) => x.id === form.customerId)
+                  if (!c) return null
+                  return (
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                      <p className="text-sm font-semibold text-gray-900">{c.name}</p>
+                      <p className="text-xs text-gray-500 mt-0.5">
+                        {[c.company, c.phone, c.email].filter(Boolean).join(" · ")}
+                      </p>
+                      {(c.city || c.state) && (
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {[c.city, c.state, c.country].filter(Boolean).join(", ")}
+                        </p>
+                      )}
+                    </div>
+                  )
+                })()}
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Status */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Status</label>
+                    <select
+                      value={form.status}
+                      onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}
+                      className={selectCls}
+                    >
+                      {STATUS_OPTIONS.map((s) => (
+                        <option key={s} value={s} className="capitalize">{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Invoice date */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Invoice Date</label>
+                    <input
+                      type="date"
+                      value={form.issueDate}
+                      onChange={(e) => setForm((p) => ({ ...p, issueDate: e.target.value }))}
+                      className={inputCls}
+                    />
+                  </div>
+
+                  {/* Due date */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">Due Date</label>
+                    <input
+                      type="date"
+                      value={form.dueDate}
+                      onChange={(e) => setForm((p) => ({ ...p, dueDate: e.target.value }))}
+                      className={inputCls}
+                    />
+                  </div>
+
+                  {/* GST rate */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                      GST Rate (%)
+                      <span className="ml-1.5 text-xs text-gray-400 font-normal">Split as CGST + SGST</span>
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      max="100"
+                      step="0.5"
+                      value={form.tax}
+                      onChange={(e) => setForm((p) => ({ ...p, tax: parseFloat(e.target.value) || 0 }))}
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+
+                {/* Notes / subject */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Notes / Subject
+                    <span className="ml-1.5 text-xs text-gray-400 font-normal">Shown on the PDF as subject line</span>
+                  </label>
+                  <textarea
+                    value={form.notes}
+                    onChange={(e) => setForm((p) => ({ ...p, notes: e.target.value }))}
+                    rows={3}
+                    placeholder="e.g. WhatsApp Platform and Marketing Monthly Advance"
+                    className="rounded-xl border border-gray-200 focus:border-[#3A7AFE] focus:outline-none text-sm px-3 py-2 w-full bg-white resize-none"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* ── Tab: Line Items ── */}
+            {tab === "items" && (
+              <div className="space-y-4">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="pb-2 text-left text-xs font-semibold text-gray-400 w-8">#</th>
+                        <th className="pb-2 text-left text-xs font-semibold text-gray-400">Description</th>
+                        <th className="pb-2 text-left text-xs font-semibold text-gray-400 w-20">HSN/SAC</th>
+                        <th className="pb-2 text-left text-xs font-semibold text-gray-400 w-16">Qty</th>
+                        <th className="pb-2 text-left text-xs font-semibold text-gray-400 w-24">Rate (₹)</th>
+                        <th className="pb-2 text-left text-xs font-semibold text-gray-400 w-24">Amount (₹)</th>
+                        <th className="pb-2 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {items.map((item, idx) => (
+                        <ItemRow
+                          key={item.id}
+                          item={item}
+                          index={idx}
+                          onChange={updateItem}
+                          onRemove={removeItem}
+                          canRemove={items.length > 1}
+                        />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={addItem}
+                  className="flex items-center gap-2 text-sm text-[#3A7AFE] hover:text-[#2563EB] font-medium px-3 py-2 rounded-xl hover:bg-blue-50 transition-colors"
+                >
+                  <Plus size={15} /> Add Line Item
+                </button>
+
+                {/* Totals preview */}
+                <div className="border-t border-gray-100 pt-4 space-y-2">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">Sub Total</span>
+                    <span className="font-semibold text-gray-900">₹{subtotal.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-gray-500">
+                      CGST {form.tax / 2}% + SGST {form.tax / 2}% = GST {form.tax}%
+                    </span>
+                    <span className="font-semibold text-gray-900">₹{taxAmt.toFixed(2)}</span>
+                  </div>
+                  {Number(form.discount) > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-500">Discount</span>
+                      <span className="font-semibold text-red-500">−₹{Number(form.discount).toFixed(2)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center text-base font-bold border-t border-gray-200 pt-2">
+                    <span className="text-gray-900">Total Payable</span>
+                    <span className="text-[#3A7AFE]">₹{total.toFixed(2)}</span>
+                  </div>
+
+                  {/* Discount field inline */}
+                  <div className="flex items-center gap-3 pt-2">
+                    <label className="text-sm text-gray-500 whitespace-nowrap">Discount (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.discount}
+                      onChange={(e) => setForm((p) => ({ ...p, discount: parseFloat(e.target.value) || 0 }))}
+                      className="rounded-xl border border-gray-200 focus:border-[#3A7AFE] focus:outline-none text-sm px-3 py-1.5 w-36 bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Tab: Settings ── */}
+            {tab === "settings" && (
+              <div className="space-y-5">
+
+                {/* Recurring toggle */}
+                <div className="flex items-center justify-between p-4 border border-gray-100 rounded-xl">
+                  <div>
+                    <p className="text-sm font-semibold text-gray-800">Recurring Invoice</p>
+                    <p className="text-xs text-gray-400 mt-0.5">Auto-generate this invoice on a schedule</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, isRecurring: !p.isRecurring }))}
+                    className={`w-11 h-6 rounded-full transition-colors relative ${
+                      form.isRecurring ? "bg-[#3A7AFE]" : "bg-gray-200"
+                    }`}
+                  >
+                    <span
+                      className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                        form.isRecurring ? "translate-x-5" : "translate-x-0"
+                      }`}
+                    />
+                  </button>
+                </div>
+
+                {form.isRecurring && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pl-1">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Frequency</label>
+                      <select
+                        value={form.recurringFrequency}
+                        onChange={(e) => setForm((p) => ({ ...p, recurringFrequency: e.target.value }))}
+                        className={selectCls}
+                      >
+                        {["weekly","monthly","quarterly","yearly"].map((f) => (
+                          <option key={f} value={f} className="capitalize">{f.charAt(0).toUpperCase() + f.slice(1)}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Cycles (leave blank = indefinite)</label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={form.recurringCycles}
+                        onChange={(e) => setForm((p) => ({ ...p, recurringCycles: e.target.value }))}
+                        placeholder="e.g. 12"
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">Start Date</label>
+                      <input
+                        type="date"
+                        value={form.recurringStartDate}
+                        onChange={(e) => setForm((p) => ({ ...p, recurringStartDate: e.target.value }))}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">End Date</label>
+                      <input
+                        type="date"
+                        value={form.recurringEndDate}
+                        onChange={(e) => setForm((p) => ({ ...p, recurringEndDate: e.target.value }))}
+                        className={inputCls}
+                      />
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
 
-          {/* ── Service Line Items ───────────────────────────────────────── */}
-          <Card>
-            <CardHeader className="pb-3">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">Service Details</CardTitle>
-                <Button type="button" size="sm" variant="outline" onClick={handleAddItem}>
-                  <Plus className="h-3.5 w-3.5 mr-1" /> Add Service
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              {formData.items.length === 0 && (
-                <p className="text-sm text-muted-foreground text-center py-3">
-                  No services added yet. Select a patient above to auto-fill, or click "Add Service".
-                </p>
+          {/* Footer */}
+          <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between gap-3 shrink-0 bg-gray-50 rounded-b-2xl">
+            {/* Total preview in footer */}
+            <div className="text-sm">
+              <span className="text-gray-400">Total: </span>
+              <span className="font-bold text-gray-900">₹{total.toFixed(2)}</span>
+              {items.length > 0 && (
+                <span className="text-gray-400 ml-2 text-xs">{items.length} item{items.length !== 1 ? "s" : ""}</span>
               )}
-
-              {formData.items.map((item, index) => (
-                <div key={index} className="border rounded-lg p-3 space-y-3 bg-muted/30">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                      Service {index + 1}
-                    </span>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6 text-red-500 hover:text-red-700"
-                      onClick={() => handleRemoveItem(index)}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                    <div className="md:col-span-2 space-y-1">
-                      <Label className="text-xs">Description *</Label>
-                      <Input
-                        value={item.description}
-                        onChange={(e) => handleItemChange(index, "description", e.target.value)}
-                        placeholder="e.g. Dialysis Treatment – 4 sessions"
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">Rate (₹)</Label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={item.rate || ""}
-                        onChange={(e) => handleItemChange(index, "rate", e.target.value)}
-                        placeholder="0.00"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">Line total:</span>
-                    <span className="font-semibold">{formatCurrency(item.amount || 0)}</span>
-                  </div>
-
-                  {item.breakdown && item.breakdown.length > 0 && (
-                    <div className="text-xs text-gray-500 border-t pt-2 space-y-1">
-                      <div className="font-semibold text-gray-700 mb-1">Breakdown</div>
-                      {item.breakdown.map((b, i) => (
-                        <div key={i} className="flex justify-between">
-                          <span>• {b.label}</span>
-                          <span>{formatCurrency(b.amount || 0)}</span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-
-              {/* Manual amount override */}
-              <div className="space-y-1 max-w-xs pt-2">
-                <Label htmlFor="planAmount" className="text-xs">
-                  Total Charges (₹) — override if needed
-                </Label>
-                <Input
-                  id="planAmount"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.amount}
-                  onChange={(e) => {
-                    const v = e.target.value
-                    const num = parseFloat(v) || 0
-                    setFormData((p) => ({
-                      ...p,
-                      amount: v,
-                      subtotal: num,
-                      items: num > 0
-                        ? [{ description: p.items[0]?.description || p.service || "Medical Service", quantity: 1, rate: num, amount: num, breakdown: p.items[0]?.breakdown }]
-                        : p.items,
-                    }))
-                  }}
-                  placeholder="0.00"
-                />
-                <p className="text-xs text-muted-foreground">
-                  Auto-filled from patient pricing. Override manually if needed.
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* ── Recurring Billing ────────────────────────────────────────── */}
-          <Card className="border-dashed border-primary/40">
-            <CardContent className="pt-4 pb-4">
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                  <RefreshCw className="h-4 w-4 text-primary" />
-                  <div>
-                    <p className="font-medium text-sm">Recurring Invoice</p>
-                    <p className="text-xs text-muted-foreground">Auto-recurring for haemodialysis, HDF & peritoneal</p>
-                  </div>
-                </div>
-                <Switch
-                  checked={formData.isRecurring}
-                  onCheckedChange={(v) => setFormData((p) => ({ ...p, isRecurring: v }))}
-                />
-              </div>
-
-              {formData.isRecurring && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2 border-t">
-                  <div className="space-y-2">
-                    <Label className="text-xs">Frequency</Label>
-                    <Select
-                      value={formData.recurringFrequency}
-                      onValueChange={(v: any) => setFormData((p) => ({ ...p, recurringFrequency: v }))}
-                    >
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="weekly">Weekly</SelectItem>
-                        <SelectItem value="monthly">Monthly</SelectItem>
-                        <SelectItem value="quarterly">Quarterly (3 months)</SelectItem>
-                        <SelectItem value="yearly">Yearly</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs">No. of Cycles</Label>
-                    <Input
-                      type="number"
-                      min="1"
-                      value={formData.recurringCycles}
-                      onChange={(e) => setFormData((p) => ({ ...p, recurringCycles: e.target.value }))}
-                      placeholder="12"
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs">Start Date <span className="text-red-500">*</span></Label>
-                    <Input
-                      type="date"
-                      value={formData.recurringStartDate}
-                      onChange={(e) => setFormData((p) => ({ ...p, recurringStartDate: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label className="text-xs">End Date (optional)</Label>
-                    <Input
-                      type="date"
-                      value={formData.recurringEndDate}
-                      onChange={(e) => setFormData((p) => ({ ...p, recurringEndDate: e.target.value }))}
-                    />
-                  </div>
-
-                  <div className="md:col-span-2 bg-blue-50 rounded-lg p-3 text-xs text-blue-700">
-                    <strong>Preview:</strong> {formData.recurringCycles} {formData.recurringFrequency} invoice(s) of{" "}
-                    <strong>{formatCurrency(totalWithGst)}</strong> = total{" "}
-                    <strong>{formatCurrency(totalWithGst * Number(formData.recurringCycles || 1))}</strong>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* ── GST Summary ──────────────────────────────────────────────── */}
-          <Card className="border-2 border-indigo-200">
-            <CardHeader className="bg-gradient-to-r from-indigo-50 to-blue-50 pb-3 pt-4 px-4 rounded-t-lg">
-              <CardTitle className="text-base text-indigo-900 flex items-center gap-2">
-                <IndianRupee className="h-4 w-4" />
-                Invoice Summary
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 pt-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-muted-foreground">Subtotal (before GST)</span>
-                <span className="font-medium">{formatCurrency(formData.subtotal)}</span>
-              </div>
-              <div className="flex justify-between text-sm text-orange-700">
-                <span>GST @ {formData.gstRate}%</span>
-                <span className="font-medium">{formatCurrency(gstAmount)}</span>
-              </div>
-              <Separator />
-              <div className="flex justify-between items-center bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg px-4 py-3">
-                <span className="font-bold">Total Payable (incl. GST)</span>
-                <span className="font-bold text-lg">{formatCurrency(totalWithGst)}</span>
-              </div>
-              {formData.isRecurring && Number(formData.recurringCycles) > 1 && (
-                <div className="flex justify-between text-sm text-emerald-700 bg-emerald-50 rounded px-3 py-2">
-                  <span>Total over {formData.recurringCycles} cycles</span>
-                  <span className="font-semibold">
-                    {formatCurrency(totalWithGst * Number(formData.recurringCycles))}
-                  </span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* ── Notes ────────────────────────────────────────────────────── */}
-          <div className="space-y-2">
-            <Label htmlFor="notes">Additional Notes</Label>
-            <Textarea
-              id="notes"
-              value={formData.notes}
-              onChange={(e) => setFormData((p) => ({ ...p, notes: e.target.value }))}
-              placeholder="Payment instructions, treatment details, or any other notes..."
-              rows={3}
-            />
-          </div>
-
-          {/* ── Error ──────────────────────────────────────────────────── */}
-          {error && (
-            <div className="flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg p-3">
-              <AlertCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
-              <p className="text-sm text-red-600">{error}</p>
             </div>
-          )}
 
-          {/* ── Actions ──────────────────────────────────────────────────── */}
-          <div className="flex justify-end gap-3 pt-2 border-t">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting} className="min-w-[140px]">
-              {isSubmitting
-                ? "Saving..."
-                : invoice
-                ? "Update Invoice"
-                : "Create Invoice"}
-            </Button>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => onOpenChange(false)}
+                className="px-5 py-2 border border-gray-200 rounded-xl text-sm text-gray-700 hover:bg-gray-100 transition-colors"
+              >
+                Cancel
+              </button>
+
+              {/* Tab navigation / submit */}
+              {tab === "details" && (
+                <button
+                  type="button"
+                  onClick={() => setTab("items")}
+                  className="px-5 py-2 bg-[#3A7AFE] hover:bg-[#2563EB] text-white text-sm font-semibold rounded-xl transition-colors"
+                >
+                  Next: Line Items →
+                </button>
+              )}
+              {tab === "items" && (
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2 bg-[#3A7AFE] hover:bg-[#2563EB] text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : isEdit ? "Update Invoice" : "Create Invoice"}
+                </button>
+              )}
+              {tab === "settings" && (
+                <button
+                  type="submit"
+                  disabled={saving}
+                  className="px-5 py-2 bg-[#3A7AFE] hover:bg-[#2563EB] text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50"
+                >
+                  {saving ? "Saving…" : isEdit ? "Update Invoice" : "Create Invoice"}
+                </button>
+              )}
+            </div>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   )
 }
