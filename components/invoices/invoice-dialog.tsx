@@ -10,7 +10,8 @@ import type { Invoice } from "@/types/crm"
 
 const STATUS_OPTIONS = ["draft", "sent", "pending", "paid", "overdue", "cancelled"]
 
-const EMPTY_ITEM = () => ({ id: crypto.randomUUID(), description: "", quantity: 1, rate: 0, amount: 0, hsn: "998313" })
+// const EMPTY_ITEM = () => ({ id: crypto.randomUUID(), description: "", quantity: 1, rate: 0, amount: 0, hsn: "998313" })
+const EMPTY_ITEM = () => ({ id: crypto.randomUUID(), description: "", quantity: "" as any, rate: "" as any, amount: 0, hsn: "998313" })
 
 const EMPTY_FORM = {
   customerId:         "",
@@ -29,15 +30,23 @@ const EMPTY_FORM = {
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
+// interface LineItem {
+//   id:          string
+//   description: string
+//   quantity:    number
+//   rate:        number
+//   amount:      number
+//   hsn:         string
+// }
+
 interface LineItem {
   id:          string
   description: string
-  quantity:    number
-  rate:        number
+  quantity:    number | string
+  rate:        number | string
   amount:      number
   hsn:         string
 }
-
 interface Props {
   invoice:        Invoice | null        // null = create mode
   open:           boolean
@@ -137,6 +146,93 @@ function CustomerPicker({
 
 // ─── Line Item Row ────────────────────────────────────────────────────────────
 
+// function ItemRow({
+//   item,
+//   index,
+//   onChange,
+//   onRemove,
+//   canRemove,
+// }: {
+//   item:     LineItem
+//   index:    number
+//   onChange: (id: string, field: keyof LineItem, value: any) => void
+//   onRemove: (id: string) => void
+//   canRemove: boolean
+// }) {
+//   const inputCls = "rounded-lg border border-gray-200 focus:border-[#3A7AFE] focus:outline-none text-sm px-2 py-1.5 w-full bg-white"
+
+//   const handleQtyRate = (field: "quantity" | "rate", val: string) => {
+//     const n = parseFloat(val) || 0
+//     const qty  = field === "quantity" ? n  : item.quantity
+//     const rate = field === "rate"     ? n  : item.rate
+//     onChange(item.id, field,    n)
+//     onChange(item.id, "amount", parseFloat((qty * rate).toFixed(2)))
+//   }
+
+//   return (
+//     <tr className="border-b border-gray-100 last:border-0">
+//       <td className="py-2 pr-2 text-center text-xs text-gray-400 w-8">{index + 1}</td>
+//       <td className="py-2 pr-2">
+//         <input
+//           type="text"
+//           value={item.description}
+//           onChange={(e) => onChange(item.id, "description", e.target.value)}
+//           placeholder="Service / item description"
+//           className={inputCls}
+//         />
+//       </td>
+//       <td className="py-2 pr-2 w-20">
+//         <input
+//           type="text"
+//           value={item.hsn}
+//           onChange={(e) => onChange(item.id, "hsn", e.target.value)}
+//           placeholder="HSN"
+//           className={inputCls}
+//         />
+//       </td>
+//       <td className="py-2 pr-2 w-16">
+//         <input
+//           type="number"
+//           min="1"
+//           value={item.quantity}
+//           onChange={(e) => handleQtyRate("quantity", e.target.value)}
+//           className={inputCls}
+//         />
+//       </td>
+//       <td className="py-2 pr-2 w-24">
+//         <input
+//           type="number"
+//           min="0"
+//           step="0.01"
+//           value={item.rate}
+//           onChange={(e) => handleQtyRate("rate", e.target.value)}
+//           className={inputCls}
+//         />
+//       </td>
+//       <td className="py-2 pr-2 w-24">
+//         <input
+//           type="number"
+//           min="0"
+//           step="0.01"
+//           value={item.amount}
+//           onChange={(e) => onChange(item.id, "amount", parseFloat(e.target.value) || 0)}
+//           className={inputCls}
+//         />
+//       </td>
+//       <td className="py-2 w-8 text-center">
+//         {canRemove && (
+//           <button
+//             type="button"
+//             onClick={() => onRemove(item.id)}
+//             className="text-gray-300 hover:text-red-500 transition-colors"
+//           >
+//             <Trash2 size={14} />
+//           </button>
+//         )}
+//       </td>
+//     </tr>
+//   )
+// }
 function ItemRow({
   item,
   index,
@@ -153,10 +249,11 @@ function ItemRow({
   const inputCls = "rounded-lg border border-gray-200 focus:border-[#3A7AFE] focus:outline-none text-sm px-2 py-1.5 w-full bg-white"
 
   const handleQtyRate = (field: "quantity" | "rate", val: string) => {
-    const n = parseFloat(val) || 0
-    const qty  = field === "quantity" ? n  : item.quantity
-    const rate = field === "rate"     ? n  : item.rate
-    onChange(item.id, field,    n)
+    // Store raw string while typing so "0" doesn't get pre-filled
+    onChange(item.id, field, val)
+    // Compute amount only when both sides are valid numbers
+    const qty  = field === "quantity" ? parseFloat(val) || 0 : parseFloat(String(item.quantity)) || 0
+    const rate = field === "rate"     ? parseFloat(val) || 0 : parseFloat(String(item.rate))     || 0
     onChange(item.id, "amount", parseFloat((qty * rate).toFixed(2)))
   }
 
@@ -186,7 +283,9 @@ function ItemRow({
           type="number"
           min="1"
           value={item.quantity}
+          placeholder="1"
           onChange={(e) => handleQtyRate("quantity", e.target.value)}
+          onFocus={(e) => { if (String(item.quantity) === "0") onChange(item.id, "quantity", "") }}
           className={inputCls}
         />
       </td>
@@ -196,7 +295,9 @@ function ItemRow({
           min="0"
           step="0.01"
           value={item.rate}
+          placeholder="0.00"
           onChange={(e) => handleQtyRate("rate", e.target.value)}
+          onFocus={(e) => { if (String(item.rate) === "0") onChange(item.id, "rate", "") }}
           className={inputCls}
         />
       </td>
@@ -205,7 +306,8 @@ function ItemRow({
           type="number"
           min="0"
           step="0.01"
-          value={item.amount}
+          value={item.amount || ""}
+          placeholder="0.00"
           onChange={(e) => onChange(item.id, "amount", parseFloat(e.target.value) || 0)}
           className={inputCls}
         />

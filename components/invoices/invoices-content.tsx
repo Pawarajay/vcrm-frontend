@@ -14,8 +14,8 @@ import { InvoiceDetailDialog } from './invoice-detail-dialog';
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const BACKEND_URL =
-  process.env.NEXT_PUBLIC_BACKEND_URL || 'https://vcrm-backend.onrender.com';
-  // process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
+  // process.env.NEXT_PUBLIC_BACKEND_URL || 'https://vcrm-backend.onrender.com';
+  process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:5000';
 
 const getLogoBase64 = async (): Promise<string> => {
   try {

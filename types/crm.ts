@@ -1,453 +1,3 @@
-
-// // ─── Tech Services (SOW §2.1) ─────────────────────────────────────────────────
-
-// export type TechService =
-//   | "website"
-//   | "whatsapp"
-//   | "lms"
-//   | "crm"
-//   | "digital_marketing"
-//   | "mobile_app"
-//   | "devops"
-//   | "ml_project"
-//   | "admin_panel"
-//   | "excel_extractor"
-//   | "word_editor"
-//   | "website_mobile"
-//   | "other"
-
-// // ─── Lead Sources ─────────────────────────────────────────────────────────────
-
-// export type LeadSource =
-//   | "referral"
-//   | "website"
-//   | "whatsapp"
-//   | "manual"
-//   | "social"
-//   | "other"
-
-// // ─── Pipeline Stages (SOW §3) ─────────────────────────────────────────────────
-
-// export type PipelineStage =
-//   | "lead"
-//   | "demo"
-//   | "proposal"
-//   | "negotiation"
-//   | "won"
-//   | "lost"
-
-// // ─── Recurring Interval ───────────────────────────────────────────────────────
-
-// export type RecurringInterval = "weekly" | "monthly" | "quarterly" | "yearly"
-
-// // ─── Customer (SOW §2.1) ─────────────────────────────────────────────────────
-
-// export interface Customer {
-//   id: string
-//   name: string
-//   email: string
-//   phone: string
-//   company?: string
-//   address?: string
-//   city?: string
-//   state?: string
-//   zipCode?: string
-//   country?: string
-//   status: "active" | "inactive" | "prospect"
-//   source?: LeadSource | string
-//   assignedTo: string
-//   tags: string[]
-//   notes?: string
-//   createdAt: Date | string
-//   updatedAt: Date | string
-//   lastContactDate?: Date | string | null
-//   totalValue: number
-//   whatsappNumber?: string
-//   service?: TechService | string | null
-//   referredBy?: string | null
-//   defaultTaxRate?: number | null
-//   defaultDueDays?: number | null
-//   defaultInvoiceNotes?: string | null
-//   recurringEnabled?: boolean
-//   recurringInterval?: RecurringInterval | null
-//   recurringAmount?: number | null
-//   recurringService?: string | null
-//   serviceType?: string | null
-//   oneTimePrice?: number | null
-//   monthlyPrice?: number | null
-//   manualPrice?: number | null
-// }
-
-// export interface CustomerPayload {
-//   name:             string
-//   phone:            string
-//   email?:           string
-//   whatsappNumber?:  string
-//   company?:         string
-//   address?:         string
-//   city?:            string
-//   state?:           string
-//   zipCode?:         string
-//   country?:         string
-//   status:           Customer["status"]
-//   source?:          LeadSource | string
-//   notes?:           string
-//   tags?:            string[]
-//   assignedTo?:      string
-//   totalValue?:      number
-//   lastContactDate?: Date | string | null
-//   service?:         TechService | string
-//   referredBy?:      string
-//   defaultTaxRate?:      number
-//   defaultDueDays?:      number
-//   defaultInvoiceNotes?: string
-//   recurringEnabled?:    boolean
-//   recurringInterval?:   RecurringInterval
-//   recurringAmount?:     number
-//   recurringService?:    string
-//   createdAt?: Date | string
-//   updatedAt?: Date | string
-//   leadId?:    string
-// }
-
-// // ─── Lead (SOW §2.2) ─────────────────────────────────────────────────────────
-
-// export interface Lead {
-//   id: string
-//   name: string
-//   email: string
-//   phone?: string
-//   company?: string
-//   whatsappNumber?: string
-//   source: LeadSource | string
-//   status: PipelineStage | string
-//   priority: "low" | "medium" | "high"
-//   service?: TechService | string | null
-//   estimatedValue: number
-//   totalAmount?: number
-//   amountReceived?: number
-//   paymentMode?: "upi" | "bank_transfer" | "cash" | null
-//   salesOwner?: string | null
-//   dealStatus?: string | null
-//   referredBy?: string | null
-//   expectedCloseDate?: Date | string | null
-//   followUpDate?: Date | string | null
-//   assignedTo: string
-//   createdBy?: string | null
-//   created_user_name?: string | null
-//   assigned_user_name?: string | null
-//   isConverted?: boolean
-//   convertedCustomerId?: string | null
-//   notes?: string
-//   nextAction?: "call" | "demo" | "follow-up" | null
-//   next_action?: "call" | "demo" | "follow-up" | null
-//   pipelineStage?: PipelineStage | string
-//   follow_up_date?: string | null
-//   follow_up_notes?: string | null
-//   follow_up_time?: string | null
-//   followUpHistory?: FollowUpEntry[]
-//   follow_up_history?: FollowUpEntry[]
-//   sales_form_data?: Record<string, any> | null
-//   salesFormDraft?: Record<string, any> | null
-//   dealFormDraft?: Record<string, any> | null
-//   deal_form_draft?: Record<string, any> | null
-//   paymentHistory?: PaymentEntry[]
-//   payment_history?: PaymentEntry[]
-//   referred_by?: string | null
-//   estimated_value?: number
-//   lead_form_draft?: Record<string, any> | null
-//   lead_form_is_draft?: number
-//   lead_form_saved_at?: string | null
-//   createdAt: Date | string
-//   updatedAt: Date | string
-// }
-
-// export interface FollowUpEntry {
-//   id?: string
-//   follow_up_date?: string
-//   followUpDate?: string
-//   notes?: string
-//   completed?: boolean
-//   created_at?: string
-//   createdAt?: string
-// }
-
-// export interface PaymentEntry {
-//   id?: string
-//   date?: string
-//   payment_date?: string
-//   amount: number
-//   mode?: string
-//   payment_mode?: string
-//   remarks?: string
-// }
-
-// // ─── Invoice (SOW §2.7 partial) ──────────────────────────────────────────────
-
-// export type InvoiceStatus =
-//   | "draft" | "sent" | "pending" | "paid" | "overdue" | "cancelled"
-
-// export interface InvoiceItem {
-//   id?: string
-//   description: string
-//   quantity: number
-//   rate: number
-//   amount: number
-//   breakdown?: string | null
-// }
-
-// export interface Invoice {
-//   id: string
-//   customerId: string
-//   customerName?: string
-//   invoiceNumber: string
-//   status: InvoiceStatus
-//   amount: number
-//   tax: number
-//   discount?: number
-//   total?: number
-//   issueDate?: Date | string | null
-//   dueDate?: Date | string | null
-//   paidDate?: Date | string | null
-//   isRecurring?: boolean
-//   recurringFrequency?: RecurringInterval | null
-//   recurringCycles?: number | null
-//   recurringStartDate?: Date | string | null
-//   recurringEndDate?: Date | string | null
-//   items: InvoiceItem[]
-//   notes?: string
-//   createdAt: Date | string
-//   updatedAt: Date | string
-// }
-
-// // ─── Retainer (SOW §2.5) ─────────────────────────────────────────────────────
-
-// export type RetainerStatus = "active" | "inactive" | "expired"
-
-// // Matches RETAINER_SERVICES array in your backend exactly (including social-media)
-// export type RetainerService =
-//   | "whatsapp"
-//   | "website"
-//   | "digital_marketing"
-//   | "crm"
-//   | "lms"
-//   | "mobile_app"
-//   | "admin_panel"
-//   | "devops"
-//   | "social-media"   // present in your backend RETAINER_SERVICES array
-//   | "other"
-
-// export interface Retainer {
-//   // Core — your backend uses UUID so id is always string
-//   id: string
-
-//   // Client
-//   clientName:  string
-//   customerId?: string | null
-
-//   // Service & financials (SOW §2.5)
-//   service:       RetainerService | string
-//   monthlyAmount: number
-
-//   // Dates (SOW §2.5)
-//   startDate:   string   // ISO YYYY-MM-DD
-//   renewalDate: string   // next renewal due date
-
-//   // Status
-//   status: RetainerStatus
-
-//   // Contact
-//   phone?:          string
-//   whatsappNumber?: string
-
-//   notes?: string
-
-//   // Audit
-//   createdBy?:     string | null
-//   createdAt?:     string | Date
-//   updatedAt?:     string | Date
-//   created_by_name?: string | null   // joined from users table in backend
-
-//   // snake_case variants — backend returns these; kept for dual-key resolver in component
-//   client_name?:     string
-//   monthly_amount?:  number
-//   start_date?:      string
-//   renewal_date?:    string
-//   whatsapp_number?: string          // backend column name
-//   customer_id?:     string | null
-//   created_by?:      string | null
-//   created_at?:      string | Date
-//   updated_at?:      string | Date
-// }
-
-// // ─── Retainer Stats (SOW §2.7 dashboard KPIs) ────────────────────────────────
-// // Shape returned by GET /api/retainers/stats
-
-// export interface RetainerStatRow {
-//   totalRetainers:  number
-//   activeCount:     number
-//   inactiveCount:   number
-//   expiredCount:    number
-//   mrr:             number   // sum of active monthly amounts
-//   renewingAlert:   number   // due within 7 days
-//   renewingWarn:    number   // due within 30 days
-//   overdueRenewals: number   // active but past renewal date
-// }
-
-// export interface RetainerServiceBreakdown {
-//   service: string
-//   count:   number
-//   revenue: number
-// }
-
-// export interface UpcomingRenewal {
-//   id:                 string
-//   client_name:        string
-//   service:            string
-//   monthly_amount:     number
-//   renewal_date:       string
-//   days_until_renewal: number
-// }
-
-// export interface RetainerMrrTrend {
-//   month:         string   // "YYYY-MM"
-//   mrr:           number
-//   newRetainers:  number
-// }
-
-// export interface RetainerStatsResponse {
-//   stats:            RetainerStatRow
-//   serviceBreakdown: RetainerServiceBreakdown[]
-//   upcomingRenewals: UpcomingRenewal[]
-//   mrrTrend:         RetainerMrrTrend[]
-// }
-
-// // ─── Retainer Payment (SOW §2.6) ─────────────────────────────────────────────
-
-// export type RetainerPaymentStatus = "paid" | "pending" | "partial"
-
-// export interface RetainerPayment {
-//   id: string
-//   retainerId:     string
-//   paymentMonth:   string              // ISO first day of month e.g. 2026-05-01
-//   expectedAmount: number
-//   receivedAmount: number
-//   paymentStatus:  RetainerPaymentStatus
-//   paymentDate?:   string | null
-//   paymentMode?:   "upi" | "bank_transfer" | "cash" | null
-//   remarks?:       string | null
-//   recordedBy?:    string | null
-//   createdAt?:     string | Date
-//   updatedAt?:     string | Date
-
-//   // Joined fields from retainers table (for SOW §2.6 tracking table display)
-//   retainerClientName?: string
-//   retainerService?:    string
-//   clientName?:         string         // alias used in some views
-
-//   // snake_case from backend
-//   retainer_id?:          string
-//   payment_month?:        string
-//   expected_amount?:      number
-//   received_amount?:      number
-//   payment_status?:       RetainerPaymentStatus
-//   payment_date?:         string | null
-//   payment_mode?:         "upi" | "bank_transfer" | "cash" | null
-//   recorded_by?:          string | null
-//   retainer_client_name?: string
-//   retainer_service?:     string
-// }
-
-// // ─── Renewal (legacy — kept so existing imports don't break) ─────────────────
-
-// export interface Renewal {
-//   id: string
-//   customerId: string
-//   service: string
-//   amount: number
-//   expiryDate: Date | string | null
-//   status: "active" | "expiring" | "expired" | "renewed"
-//   reminderDays?: number
-//   notes?: string
-//   createdAt: Date | string
-//   updatedAt: Date | string
-// }
-
-// export interface RenewalReminder {
-//   id: string
-//   customerId: string
-//   serviceType: string
-//   serviceName: string
-//   expiryDate: Date | string
-//   reminderDays: number[]
-//   lastReminderSent?: Date | string
-//   status: "active" | "renewed" | "expired" | "cancelled"
-//   whatsappTemplate: string
-//   createdAt: Date | string
-//   updatedAt: Date | string
-// }
-
-// // ─── User ─────────────────────────────────────────────────────────────────────
-
-// export interface User {
-//   id: string
-//   name: string
-//   email: string
-//   role: "admin" | "user"
-//   avatar?: string
-//   isActive: boolean
-//   createdAt: Date | string
-// }
-
-// // ─── Deal (stub — SOW uses Lead pipeline instead) ────────────────────────────
-
-// /** @deprecated Vasifytech uses the Lead pipeline for deal tracking. */
-// export interface Deal {
-//   id: string
-//   title: string
-//   customerId: string
-//   value: number
-//   stage:
-//     | "prospecting" | "qualification" | "proposal"
-//     | "negotiation" | "closed-won" | "closed-lost"
-//   probability: number
-//   expectedCloseDate: Date | string
-//   actualCloseDate?: Date | string
-//   assignedTo: string
-//   products: string[]
-//   notes: string
-//   createdAt: Date | string
-//   updatedAt: Date | string
-// }
-
-// // ─── Task (stub) ──────────────────────────────────────────────────────────────
-
-// /** @deprecated Not used in this phase of Vasifytech CRM. */
-// export interface Task {
-//   id: string
-//   title: string
-//   description: string
-//   type: "call" | "email" | "meeting" | "follow-up" | "demo" | "other"
-//   priority: "low" | "medium" | "high"
-//   status: "pending" | "in-progress" | "completed" | "cancelled"
-//   assignedTo: string
-//   relatedTo: { type: "customer" | "lead" | "deal"; id: string }
-//   dueDate: Date | string
-//   completedAt?: Date | string
-//   createdAt: Date | string
-//   updatedAt: Date | string
-// }
-
-
-
-//testing (14-05-2026)
-
-
-
-// types/crm.ts
-
-// ─── Tech Services (SOW §2.1) ─────────────────────────────────────────────────
-
 export type TechService =
   | "website"
   | "whatsapp"
@@ -513,6 +63,26 @@ export interface Customer {
   service?:         TechService | string | null
   referredBy?:      string | null
 
+  // ── Deal Value breakdown (Customers table "Deal Value" column) ───────────
+  // dealValue       = Total agreed amount for the deal
+  // paidAmount      = Amount the client has paid so far (advance/installments)
+  // expectedAmount  = Remaining / Due — ALWAYS derived as dealValue - paidAmount.
+  //                   Never set directly by the user; recalculated and saved
+  //                   every time dealValue or paidAmount changes.
+  dealValue?:       number | null
+  paidAmount?:      number | null   // ✅ NEW
+  expectedAmount?:  number | null   // ✅ NEW — represents "Remaining / Due"
+
+  // Customers-page extra fields (sales_rep / closure_date / business_type etc.)
+  assignedUser?:    string | null
+  salesRep?:        string | null
+  businessType?:    string | null
+  onboardingDate?:  Date | string | null
+  renewalDate?:     Date | string | null
+  closureDate?:     Date | string | null
+  bloodGroup?:      string | null
+  dateOfBirth?:     Date | string | null
+
   // Invoice defaults
   defaultTaxRate?:      number | null
   defaultDueDays?:      number | null
@@ -551,6 +121,9 @@ export interface CustomerPayload {
   lastContactDate?: Date | string | null
   service?:         TechService | string
   referredBy?:      string
+  dealValue?:       number | null
+  paidAmount?:      number | null   // ✅ NEW
+  expectedAmount?:  number | null   // ✅ NEW
   defaultTaxRate?:      number
   defaultDueDays?:      number
   defaultInvoiceNotes?: string
@@ -580,6 +153,7 @@ export interface Lead {
   // SOW §2.3: Deal amounts
   estimatedValue:  number
   totalAmount?:    number
+  expectedAmount?: number 
   amountReceived?: number
   paymentMode?:    "upi" | "bank_transfer" | "cash" | null
 
@@ -635,7 +209,7 @@ export interface Lead {
   // snake_case aliases from DB
   referred_by?:      string | null
   estimated_value?:  number
-
+   expected_amount?:  number   
   createdAt: Date | string
   updatedAt: Date | string
 }

@@ -63,7 +63,8 @@ interface LeadDialogProps {
 type LeadFormState = {
   name: string; phone: string; whatsappNumber: string; email: string;
   company: string; referredBy: string; notes: string;
-  estimatedValue: string; expectedAmount: string; priority: string;
+  estimatedValue: string; expectedAmount: string;  // ── NEW: replaced expectedAmount ──
+  priority: string;
 };
 
 const DEFAULT_FORM: LeadFormState = {
@@ -120,9 +121,12 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
         company:        lead.company              ?? "",
         referredBy:     (lead as any).referred_by ?? "",
         notes:          lead.notes                ?? "",
-        estimatedValue: String(lead.estimatedValue ?? ""),
-        expectedAmount: String((lead as any).expectedAmount ?? (lead as any).expected_amount ?? ""),
-        priority:       (lead.priority as string) ?? "medium",
+        estimatedValue: String(lead.estimatedValue ?? (lead as any).total_amount ?? ""),
+        // ── NEW: read expectedAmount from both camelCase and snake_case ──
+        expectedAmount: String(
+          (lead as any).expectedAmount ?? (lead as any).expected_amount ?? ""
+        ),
+        priority: (lead.priority as string) ?? "medium",
       });
       setService(((lead as any).service as VasifyService) ?? "");
       setSource(((lead as any).source  as LeadSource)     ?? "");
@@ -156,18 +160,34 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
       setError("Please enter a valid email address."); return;
     }
     if (mode === "add" && !service) { setError("Please select a service."); return; }
+
     const estimatedValue = form.estimatedValue ? Number(form.estimatedValue) : 0;
-    const expectedAmount = form.expectedAmount  ? Number(form.expectedAmount) : 0;
-    if (isNaN(estimatedValue) || estimatedValue < 0) { setError("Total amount must be a valid number."); return; }
-    if (isNaN(expectedAmount) || expectedAmount < 0) { setError("Expected amount must be a valid number."); return; }
+    const expectedAmount = form.expectedAmount  ? Number(form.expectedAmount)  : 0;  // ── NEW ──
+
+    if (isNaN(estimatedValue) || estimatedValue < 0) {
+      setError("Total amount must be a valid number."); return;
+    }
+    if (isNaN(expectedAmount) || expectedAmount < 0) {
+      setError("Expected amount must be a valid number."); return;
+    }
+    if (expectedAmount > estimatedValue && estimatedValue > 0) {
+      setError("Expected amount cannot be greater than the total amount."); return;
+    }
 
     const payload: any = {
       name, phone,
-      email: form.email.trim() || undefined, whatsappNumber: form.whatsappNumber || undefined,
-      company: form.company || undefined, referredBy: form.referredBy || undefined,
-      notes: form.notes || undefined, estimatedValue, expectedAmount,
-      priority: form.priority, service: service || undefined,
-      source: source || "manual", expectedCloseDate: closureDate, followUpDate,
+      email: form.email.trim() || undefined,
+      whatsappNumber: form.whatsappNumber || undefined,
+      company: form.company || undefined,
+      referredBy: form.referredBy || undefined,
+      notes: form.notes || undefined,
+      estimatedValue,
+      expectedAmount,    // ── NEW ──
+      priority: form.priority,
+      service: service || undefined,
+      source: source || "manual",
+      expectedCloseDate: closureDate,
+      followUpDate,
     };
     if (mode === "add") payload.status = "lead";
 
@@ -284,26 +304,50 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
             </Field>
           </Section>
 
-          {/* Deal Amount */}
+          {/* Deal Amount — updated section with two fields */}
           <Section label="Deal Amount">
             <div className="grid grid-cols-2 gap-4">
               <Field label="Total Amount (₹)" hint="Gross deal value">
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">₹</span>
-                  <Input type="number" value={form.estimatedValue} onChange={set("estimatedValue")}
+                  <Input
+                    type="number"
+                    value={form.estimatedValue}
+                    onChange={set("estimatedValue")}
                     min="0" step="1" placeholder="0"
-                    className="pl-7 h-9 rounded-xl border-gray-200 text-sm focus-visible:ring-0 focus-visible:border-blue-500" />
+                    className="pl-7 h-9 rounded-xl border-gray-200 text-sm focus-visible:ring-0 focus-visible:border-blue-500"
+                  />
                 </div>
               </Field>
+              {/* ── NEW: Expected Amount field ── */}
               <Field label="Expected Amount (₹)" hint="What you expect to receive">
                 <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm select-none">₹</span>
-                  <Input type="number" value={form.expectedAmount} onChange={set("expectedAmount")}
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-amber-400 text-sm select-none">₹</span>
+                  <Input
+                    type="number"
+                    value={form.expectedAmount}
+                    onChange={set("expectedAmount")}
                     min="0" step="1" placeholder="0"
-                    className="pl-7 h-9 rounded-xl border-gray-200 text-sm focus-visible:ring-0 focus-visible:border-blue-500" />
+                    className="pl-7 h-9 rounded-xl border-gray-200 text-sm focus-visible:ring-0 focus-visible:border-amber-400"
+                  />
                 </div>
               </Field>
             </div>
+            {/* Live hint: show balance if both are filled */}
+            {form.estimatedValue && form.expectedAmount &&
+             Number(form.estimatedValue) > 0 && Number(form.expectedAmount) > 0 && (
+              <div className="flex items-center gap-2 text-[11px] text-gray-400 mt-1">
+                <span className="font-medium text-gray-500">Balance:</span>
+                <span className={cn(
+                  "font-bold",
+                  Number(form.estimatedValue) - Number(form.expectedAmount) < 0
+                    ? "text-red-500"
+                    : "text-emerald-600"
+                )}>
+                  ₹{(Number(form.estimatedValue) - Number(form.expectedAmount)).toLocaleString("en-IN")}
+                </span>
+              </div>
+            )}
           </Section>
 
           {/* Dates */}

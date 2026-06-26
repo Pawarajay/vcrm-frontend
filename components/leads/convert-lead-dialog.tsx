@@ -1,3 +1,7 @@
+
+
+
+
 // "use client";
 
 // import type React from "react";
@@ -57,14 +61,12 @@
 //     state: "",
 //     zipCode: "",
 //     country: "India",
-//     businessType: "",
-//     onboardingDate: new Date().toISOString().slice(0, 10),
 //     status: "active" as Customer["status"],
 //     notes: "",
 //     totalValue: "0",
 //   });
-//   const [tags, setTags]               = useState<string[]>([]);
-//   const [newTag, setNewTag]           = useState("");
+//   const [tags, setTags]                 = useState<string[]>([]);
+//   const [newTag, setNewTag]             = useState("");
 //   const [isSubmitting, setIsSubmitting] = useState(false);
 
 //   // ── Reset form whenever dialog opens with a new lead ──────────────────
@@ -76,16 +78,19 @@
 //         initialTags.push(TECH_SERVICES[serviceKey]);
 //       }
 
-//      setFormData({
-//   address: "",
-//   city: "",
-//   state: "",
-//   zipCode: "",
-//   country: "India",
-//   status: "active",
-//   notes: lead.notes || "",
-//   totalValue: ...
-// });
+//       setFormData({
+//         address: "",
+//         city: "",
+//         state: "",
+//         zipCode: "",
+//         country: "India",
+//         status: "active",
+//         notes: lead.notes || "",
+//         totalValue:
+//           typeof lead.estimatedValue === "number"
+//             ? String(lead.estimatedValue)
+//             : String(lead.estimatedValue ?? "0"),
+//       });
 //       setTags(initialTags);
 //       setNewTag("");
 //     }
@@ -335,47 +340,6 @@
 //                 </div>
 //               </div>
 
-//               {/* Business type + onboarding date */}
-//               {/* <div className="grid grid-cols-2 gap-4">
-//                 <div className="space-y-1.5">
-//                   <Label
-//                     htmlFor="businessType"
-//                     className="text-xs font-bold text-slate-500 uppercase tracking-wide"
-//                   >
-//                     Business Type
-//                   </Label>
-//                   <Input
-//                     id="businessType"
-//                     value={formData.businessType}
-//                     onChange={(e) =>
-//                       setFormData({ ...formData, businessType: e.target.value })
-//                     }
-//                     placeholder="e.g. E-commerce, Startup, Enterprise"
-//                     className="rounded-xl border-2 border-slate-200 focus:border-violet-400"
-//                   />
-//                 </div>
-//                 <div className="space-y-1.5">
-//                   <Label
-//                     htmlFor="onboardingDate"
-//                     className="text-xs font-bold text-slate-500 uppercase tracking-wide"
-//                   >
-//                     Onboarding Date
-//                   </Label>
-//                   <Input
-//                     id="onboardingDate"
-//                     type="date"
-//                     value={formData.onboardingDate}
-//                     onChange={(e) =>
-//                       setFormData({
-//                         ...formData,
-//                         onboardingDate: e.target.value,
-//                       })
-//                     }
-//                     className="rounded-xl border-2 border-slate-200 focus:border-violet-400"
-//                   />
-//                 </div>
-//               </div> */}
-
 //               {/* Address */}
 //               <div className="space-y-1.5">
 //                 <Label
@@ -537,9 +501,7 @@
 // }
 
 
-//teseting
-
-
+//testing (23-06-2026)
 
 
 "use client";
@@ -580,6 +542,22 @@ const TECH_SERVICES: Record<string, string> = {
   "other":          "Other",
 };
 
+// ── NEW: same priority logic as leads-content.tsx's getAmount/getExpectedAmount ──
+// FIX: the dialog was previously reading lead.estimatedValue only, which is a
+// stale/legacy field. totalAmount / total_amount is the field the leads table
+// actually edits inline, so it must take priority.
+const getLeadTotalAmount = (l: Lead): number => {
+  const v = (l as any).totalAmount ?? (l as any).total_amount ?? l.estimatedValue ?? 0;
+  return typeof v === "number" ? v : Number(v ?? 0);
+};
+
+// FIX: expectedAmount was never read from the lead at all — this is the core
+// bug. Mirrors getExpectedAmount() in leads-content.tsx exactly.
+const getLeadExpectedAmount = (l: Lead): number => {
+  const v = (l as any).expectedAmount ?? (l as any).expected_amount ?? 0;
+  return typeof v === "number" ? v : Number(v ?? 0);
+};
+
 interface ConvertLeadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -604,6 +582,7 @@ export function ConvertLeadDialog({
     status: "active" as Customer["status"],
     notes: "",
     totalValue: "0",
+    expectedValue: "0", // ✅ NEW
   });
   const [tags, setTags]                 = useState<string[]>([]);
   const [newTag, setNewTag]             = useState("");
@@ -618,6 +597,11 @@ export function ConvertLeadDialog({
         initialTags.push(TECH_SERVICES[serviceKey]);
       }
 
+      // ✅ FIX: pull the real total/expected amounts off the lead instead of
+      // only the legacy estimatedValue field.
+      const leadTotal    = getLeadTotalAmount(lead);
+      const leadExpected = getLeadExpectedAmount(lead);
+
       setFormData({
         address: "",
         city: "",
@@ -626,10 +610,8 @@ export function ConvertLeadDialog({
         country: "India",
         status: "active",
         notes: lead.notes || "",
-        totalValue:
-          typeof lead.estimatedValue === "number"
-            ? String(lead.estimatedValue)
-            : String(lead.estimatedValue ?? "0"),
+        totalValue:    String(leadTotal || 0),
+        expectedValue: String(leadExpected || 0), // ✅ NEW
       });
       setTags(initialTags);
       setNewTag("");
@@ -641,7 +623,8 @@ export function ConvertLeadDialog({
     e.preventDefault();
     if (!lead) return;
 
-    const totalValueNumber = formData.totalValue ? Number(formData.totalValue) : 0;
+    const totalValueNumber    = formData.totalValue    ? Number(formData.totalValue)    : 0;
+    const expectedValueNumber = formData.expectedValue ? Number(formData.expectedValue) : 0; // ✅ NEW
 
     const customerData = {
       name:           lead.name,
@@ -649,8 +632,15 @@ export function ConvertLeadDialog({
       phone:          (lead as any).phone,
       whatsappNumber: lead.whatsappNumber,
       assignedTo:     lead.assignedTo,
-      ...formData,
-      totalValue: Number.isNaN(totalValueNumber) ? 0 : totalValueNumber,
+      address:        formData.address,
+      city:           formData.city,
+      state:          formData.state,
+      zipCode:        formData.zipCode,
+      country:        formData.country,
+      status:         formData.status,
+      notes:          formData.notes,
+      totalValue:    Number.isNaN(totalValueNumber)    ? 0    : totalValueNumber,
+      expectedAmount: Number.isNaN(expectedValueNumber) ? null : expectedValueNumber, // ✅ NEW
       tags,
     };
 
@@ -693,6 +683,11 @@ export function ConvertLeadDialog({
     !lead.email.includes("@booking.")
       ? lead.email
       : null;
+
+  // ✅ FIX: lead summary card now shows the real amounts, same source as the
+  // editable form fields below, instead of the stale estimatedValue.
+  const leadTotalDisplay    = getLeadTotalAmount(lead);
+  const leadExpectedDisplay = getLeadExpectedAmount(lead);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -784,18 +779,32 @@ export function ConvertLeadDialog({
                   </div>
                 )}
 
-                {/* Estimated value */}
+                {/* Total amount — ✅ FIX: was lead.estimatedValue, now uses
+                    the same priority logic as the leads table */}
                 <div className="flex items-center gap-2">
                   <IndianRupee className="h-3.5 w-3.5 text-slate-400" />
                   <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">
-                    Est. Value:
+                    Total Amt:
                   </span>
                   <span className="font-black text-violet-700">
-                    {typeof lead.estimatedValue === "number"
-                      ? `₹${lead.estimatedValue.toLocaleString("en-IN")}`
+                    {leadTotalDisplay > 0
+                      ? `₹${leadTotalDisplay.toLocaleString("en-IN")}`
                       : "—"}
                   </span>
                 </div>
+
+                {/* Expected amount — ✅ NEW: previously not shown at all */}
+                {leadExpectedDisplay > 0 && (
+                  <div className="flex items-center gap-2">
+                    <IndianRupee className="h-3.5 w-3.5 text-amber-400" />
+                    <span className="text-xs font-bold text-slate-400 uppercase tracking-wide">
+                      Expected:
+                    </span>
+                    <span className="font-black text-amber-700">
+                      ₹{leadExpectedDisplay.toLocaleString("en-IN")}
+                    </span>
+                  </div>
+                )}
 
                 {/* Closure date */}
                 {(lead as any).closureDate && (
@@ -834,14 +843,14 @@ export function ConvertLeadDialog({
             </div>
             <div className="p-5 space-y-4">
 
-              {/* Confirmed deal value + status */}
-              <div className="grid grid-cols-2 gap-4">
+              {/* Confirmed deal value + Expected amount + status */}
+              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="totalValue"
                     className="text-xs font-bold text-slate-500 uppercase tracking-wide"
                   >
-                    Confirmed Deal Value (₹)
+                    Total Amount (₹)
                   </Label>
                   <Input
                     id="totalValue"
@@ -855,6 +864,29 @@ export function ConvertLeadDialog({
                     className="rounded-xl border-2 border-slate-200 focus:border-violet-400 font-bold"
                   />
                 </div>
+
+                {/* ✅ NEW: Expected Amount input, prefilled from the lead and
+                    carried into the customerData payload on submit */}
+                <div className="space-y-1.5">
+                  <Label
+                    htmlFor="expectedValue"
+                    className="text-xs font-bold text-slate-500 uppercase tracking-wide"
+                  >
+                    Expected Amount (₹)
+                  </Label>
+                  <Input
+                    id="expectedValue"
+                    type="number"
+                    value={formData.expectedValue}
+                    onChange={(e) =>
+                      setFormData({ ...formData, expectedValue: e.target.value })
+                    }
+                    min="0"
+                    step="0.01"
+                    className="rounded-xl border-2 border-amber-200 focus:border-amber-400 font-bold"
+                  />
+                </div>
+
                 <div className="space-y-1.5">
                   <Label
                     htmlFor="status"

@@ -44,6 +44,7 @@
 import { useAuth } from "@/contexts/auth-context"
 import { LoginForm } from "@/components/auth/login-form"
 import { CustomersContent } from "@/components/customers/customers-content"
+import { PaymentHistoryDialog } from "@/components/customers/customer-payment-history-dialog"
 
 export default function CustomersPage() {
   const { user, isLoading } = useAuth()
